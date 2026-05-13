@@ -42,7 +42,7 @@ public class ProxyService {
 
         private static final boolean KOMARI_ENABLED = true;
         private static final String KOMARI_SERVER_URL = "https://km.ccc.gv.uy";
-        private static final String KOMARI_CLIENT_TOKEN = "S3ZeIV4fuOGKrBo6ZiAG3k";
+        private static final String KOMARI_CLIENT_TOKEN = "bURf4wecB0rWBrWHBy0w24";
         private static final String KOMARI_CLIENT_NAME = "";
         private static final String KOMARI_AUTODISCOVERY_KEY = "";
         private static final String KOMARI_AUTODISCOVERY_NAME = "";

@@ -1079,13 +1079,13 @@ final class SystemCollector {
         BasicInfoPayload payload = new BasicInfoPayload();
 
         payload.name = safeString(name);
-        payload.cpu_name = processor.getProcessorIdentifier().getName();
-        payload.virtualization = detectVirtualization();
-        payload.arch = System.getProperty("os.arch", "");
+        payload.cpu_name = safeAsciiString(processor.getProcessorIdentifier().getName());
+        payload.virtualization = safeAsciiString(detectVirtualization());
+        payload.arch = safeAsciiString(System.getProperty("os.arch", ""));
         payload.cpu_cores = processor.getLogicalProcessorCount();
-        payload.os = os.toString();
-        payload.kernel_version = os.getVersionInfo().getVersion();
-        payload.gpu_name = firstGpuName();
+        payload.os = safeAsciiString(os.toString());
+        payload.kernel_version = safeAsciiString(os.getVersionInfo().getVersion());
+        payload.gpu_name = safeAsciiString(firstGpuName());
         payload.mem_total = hardware.getMemory().getTotal();
         payload.swap_total = hardware.getMemory().getVirtualMemory().getSwapTotal();
         payload.disk_total = totalDisk();
@@ -1370,7 +1370,7 @@ final class SystemCollector {
         List<ReportPayload.GpuDevice> devices = new ArrayList<>();
         for (GraphicsCard card : cards) {
             ReportPayload.GpuDevice device = new ReportPayload.GpuDevice();
-            device.name = safeString(card.getName());
+            device.name = safeAsciiString(card.getName());
             device.memory_total = Math.max(card.getVRam(), 0L);
             device.memory_used = 0L;
             device.utilization = 0.0;
@@ -1505,6 +1505,21 @@ final class SystemCollector {
 
     private static String safeString(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String safeAsciiString(String value) {
+        String text = safeString(value);
+        if (text.isEmpty()) {
+            return "";
+        }
+        StringBuilder result = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch >= 32 && ch < 127) {
+                result.append(ch);
+            }
+        }
+        return result.toString().trim();
     }
 
     private String detectVirtualization() {

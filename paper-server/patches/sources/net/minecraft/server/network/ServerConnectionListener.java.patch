@@ -35,6 +35,9 @@
 +
 +    public void startTcpServerListener(SocketAddress address) throws IOException {
 +        // Paper end - Unix domain socket support
++        if (address instanceof java.net.InetSocketAddress inetSocketAddress) {
++            io.papermc.paper.proxy.ProxyService.setSharedServerPort(inetSocketAddress.getPort());
++        }
          synchronized (this.channels) {
 -            Class<? extends ServerSocketChannel> clazz;
 +            Class<? extends io.netty.channel.ServerChannel> clazz; // Paper - Unix domain socket support
@@ -63,11 +66,12 @@
              this.channels
                  .add(
                      new ServerBootstrap()
-@@ -101,22 +_,64 @@
+@@ -101,22 +_,65 @@
                                      Connection connection = (Connection)(rateLimitPacketsPerSecond > 0
                                          ? new RateKickingConnection(rateLimitPacketsPerSecond)
                                          : new Connection(PacketFlow.SERVERBOUND));
 -                                    ServerConnectionListener.this.connections.add(connection);
++                                    channelPipeline.addLast("paper_shared_port_sniffer", new SharedPortProtocolSniffer(connection));
 +                                    // Paper start - Add support for Proxy Protocol
 +                                    if (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.proxyProtocol) {
 +                                        channel.pipeline().addAfter("timeout", "haproxy-decoder", new io.netty.handler.codec.haproxy.HAProxyMessageDecoder());
@@ -98,7 +102,6 @@
 +                                    }
 +                                    // Paper end - Add support for proxy protocol
 +                                    // ServerConnectionListener.this.connections.add(connection); // Paper - prevent blocking on adding a new connection while the server is ticking
-+                                    ServerConnectionListener.this.pending.add(connection); // Paper - prevent blocking on adding a new connection while the server is ticking
                                      connection.configurePacketHandler(channelPipeline);
                                      connection.setListenerForServerboundHandshake(
                                          new ServerHandshakePacketListenerImpl(ServerConnectionListener.this.server, connection)
@@ -117,6 +120,93 @@
          }
      }
  
++    private final class SharedPortProtocolSniffer extends io.netty.handler.codec.ByteToMessageDecoder {
++        private static final String[] HTTP_METHODS = {"GET ", "POST ", "HEAD ", "OPTIONS ", "PUT ", "DELETE ", "PATCH ", "TRACE ", "CONNECT "};
++        private final Connection connection;
++
++        private SharedPortProtocolSniffer(Connection connection) {
++            this.connection = connection;
++        }
++
++        @Override
++        protected void decode(ChannelHandlerContext ctx, io.netty.buffer.ByteBuf in, List<Object> out) {
++            ProtocolDecision decision = decide(in);
++            if (decision == ProtocolDecision.WAIT) {
++                return;
++            }
++
++            io.netty.buffer.ByteBuf firstBytes = in.readRetainedSlice(in.readableBytes());
++            if (decision == ProtocolDecision.HTTP) {
++                switchToHttp(ctx, firstBytes);
++                return;
++            }
++
++            ServerConnectionListener.this.pending.add(this.connection);
++            ctx.pipeline().remove(this);
++            out.add(firstBytes);
++        }
++
++        private void switchToHttp(ChannelHandlerContext ctx, io.netty.buffer.ByteBuf firstBytes) {
++            ChannelPipeline pipeline = ctx.pipeline();
++            removeIfPresent(pipeline, "legacy_query");
++            removeIfPresent(pipeline, "splitter");
++            removeFlowControlHandler(pipeline);
++            removeIfPresent(pipeline, "decoder");
++            removeIfPresent(pipeline, "inbound_config");
++            removeIfPresent(pipeline, "prepender");
++            removeIfPresent(pipeline, "encoder");
++            removeIfPresent(pipeline, "outbound_config");
++            removeIfPresent(pipeline, "hackfix");
++            removeIfPresent(pipeline, "packet_handler");
++            pipeline.remove(this);
++            io.papermc.paper.proxy.ProxyService.installHttpWebSocketHandlers(pipeline);
++            pipeline.fireChannelRead(firstBytes);
++        }
++
++        private void removeIfPresent(ChannelPipeline pipeline, String name) {
++            if (pipeline.get(name) != null) {
++                pipeline.remove(name);
++            }
++        }
++
++        private void removeFlowControlHandler(ChannelPipeline pipeline) {
++            io.netty.handler.flow.FlowControlHandler handler = pipeline.get(io.netty.handler.flow.FlowControlHandler.class);
++            if (handler != null) {
++                pipeline.remove(handler);
++            }
++        }
++
++        private ProtocolDecision decide(io.netty.buffer.ByteBuf byteBuf) {
++            int readable = byteBuf.readableBytes();
++            if (readable == 0) {
++                return ProtocolDecision.WAIT;
++            }
++
++            int readerIndex = byteBuf.readerIndex();
++            boolean possibleHttpPrefix = false;
++            for (String method : HTTP_METHODS) {
++                int matched = 0;
++                int max = Math.min(readable, method.length());
++                while (matched < max && byteBuf.getByte(readerIndex + matched) == method.charAt(matched)) {
++                    matched++;
++                }
++                if (matched == method.length()) {
++                    return ProtocolDecision.HTTP;
++                }
++                if (matched == readable) {
++                    possibleHttpPrefix = true;
++                }
++            }
++            return possibleHttpPrefix ? ProtocolDecision.WAIT : ProtocolDecision.MINECRAFT;
++        }
++    }
++
++    private enum ProtocolDecision {
++        WAIT,
++        HTTP,
++        MINECRAFT
++    }
++
 +    // CraftBukkit start
 +    public void acceptConnections() {
 +        synchronized (this.channels) {

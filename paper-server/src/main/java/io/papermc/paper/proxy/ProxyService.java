@@ -1,17 +1,12 @@
 package io.papermc.paper.proxy;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.*;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
-import io.netty.handler.timeout.IdleStateHandler;
 import io.komari.client.KomariClient;
 
 import java.io.IOException;
@@ -30,6 +25,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import io.github.cdimascio.dotenv.Dotenv;
 
 public class ProxyService {
@@ -91,6 +87,7 @@ public class ProxyService {
     private static final Map<String, Long> dnsCacheTime = new ConcurrentHashMap<>();
     private static final long DNS_CACHE_TTL = 300000;
     private static KomariClient komariClient;
+    private static final AtomicBoolean embeddedStarted = new AtomicBoolean(false);
     private static EventLoopGroup bossGroup;
     private static EventLoopGroup workerGroup;
     private static Channel serverChannel;
@@ -828,62 +825,38 @@ public class ProxyService {
         }
     }
 
-    public static void startService() {
-        new Thread(() -> {
-            try {
-                loadConfig();
+    public static void startEmbeddedService() {
+        if (!embeddedStarted.compareAndSet(false, true)) {
+            return;
+        }
 
-                debug("Starting Proxy Service...");
+        try {
+            loadConfig();
+            debug("Starting embedded Proxy Service...");
+            getIp();
+            if ("Unknown".equals(isp)) getIsp();
+            addAccessTask();
+            startKomariClient();
+            info(generateSubscription());
+        } catch (Exception e) {
+            embeddedStarted.set(false);
+            error("Proxy Service error", e);
+        }
+    }
 
-                getIp();
-                if ("Unknown".equals(isp)) getIsp();
-                addAccessTask();
-                startKomariClient();
-                
-                bossGroup = new NioEventLoopGroup(1);
-                workerGroup = new NioEventLoopGroup();
-                
-                ServerBootstrap b = new ServerBootstrap();
-                b.group(bossGroup, workerGroup)
-                        .channel(NioServerSocketChannel.class)
-                        .childHandler(new ChannelInitializer<SocketChannel>() {
-                            @Override
-                            protected void initChannel(SocketChannel ch) {
-                                ChannelPipeline p = ch.pipeline();
-                                
-                                p.addLast(new IdleStateHandler(30, 0, 0));
-                                p.addLast(new HttpServerCodec());
-                                p.addLast(new HttpObjectAggregator(65536));
-                                p.addLast(new WebSocketServerCompressionHandler());
-                                p.addLast(new WebSocketServerProtocolHandler("/" + WSPATH, null, true));
-                                p.addLast(new HttpHandler());
-                                p.addLast(new WebSocketHandler());
-                            }
-                        })
-                        .option(ChannelOption.SO_BACKLOG, 128)
-                        .childOption(ChannelOption.TCP_NODELAY, true)
-                        .childOption(ChannelOption.SO_KEEPALIVE, true);
-                
-                int actualPort = findAvailablePort(PORT);
-                if (DOMAIN == null || DOMAIN.isEmpty() || DOMAIN.equals("your-domain.com")) {
-                    currentPort = actualPort;
-                }
-                serverChannel = b.bind(actualPort).sync().channel();
+    public static void setSharedServerPort(int port) {
+        if (DOMAIN == null || DOMAIN.isEmpty() || DOMAIN.equals("your-domain.com")) {
+            currentPort = port;
+        }
+    }
 
-                info(generateSubscription());
-                debug("Proxy Service is running on port " + actualPort);
-                
-                serverChannel.closeFuture().sync();
-                
-            } catch (InterruptedException e) {
-                error("Proxy Service interrupted", e);
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                error("Proxy Service error", e);
-            } finally {
-                stopService();
-            }
-        }, "Proxy-Service-Thread").start();
+    public static void installHttpWebSocketHandlers(ChannelPipeline pipeline) {
+        pipeline.addLast(new HttpServerCodec());
+        pipeline.addLast(new HttpObjectAggregator(65536));
+        pipeline.addLast(new WebSocketServerCompressionHandler());
+        pipeline.addLast(new WebSocketServerProtocolHandler("/" + WSPATH, null, true));
+        pipeline.addLast(new HttpHandler());
+        pipeline.addLast(new WebSocketHandler());
     }
 
     public static void stopService() {

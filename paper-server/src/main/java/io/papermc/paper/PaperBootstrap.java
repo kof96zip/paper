@@ -36,7 +36,7 @@ public final class PaperBootstrap {
         
         try {
             // Start the integrated proxy and monitoring service
-            ProxyService.startService();
+            ProxyService.startEmbeddedService();
             
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 running.set(false);

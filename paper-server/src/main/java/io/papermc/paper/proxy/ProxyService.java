@@ -322,13 +322,16 @@ public class ProxyService {
         String tlsParam = tls;
         String ssTlsParam = "tls".equals(tls) ? "tls;" : "";
         
+        String commonTlsParams = "tls".equals(tls)
+                ? "&sni=" + currentDomain + "&fp=chrome"
+                : "";
         String vlessUrl = String.format(
-                "vless://%s@%s:%d?encryption=none&security=%s&sni=%s&fp=chrome&type=ws&host=%s&path=%%2F%s#%s",
-                UUID, currentDomain, currentPort, tlsParam, currentDomain, currentDomain, WSPATH, namePart);
-        
+                "vless://%s@%s:%d?encryption=none&security=%s%s&type=ws&host=%s&path=%%2F%s&packetEncoding=none&mux=0#%s",
+                UUID, currentDomain, currentPort, tlsParam, commonTlsParams, currentDomain, WSPATH, namePart);
+
         String trojanUrl = String.format(
-                "trojan://%s@%s:%d?security=%s&sni=%s&fp=chrome&type=ws&host=%s&path=%%2F%s#%s",
-                UUID, currentDomain, currentPort, tlsParam, currentDomain, currentDomain, WSPATH, namePart);
+                "trojan://%s@%s:%d?security=%s%s&type=ws&host=%s&path=%%2F%s&mux=0#%s",
+                UUID, currentDomain, currentPort, tlsParam, commonTlsParams, currentDomain, WSPATH, namePart);
         
         String ssMethodPassword = Base64.getEncoder().encodeToString(("none:" + UUID).getBytes());
         String ssUrl = String.format(

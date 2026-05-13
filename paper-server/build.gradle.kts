@@ -4,6 +4,8 @@ import io.papermc.paperweight.util.*
 import io.papermc.paperweight.util.data.FileEntry
 import paper.libs.com.google.gson.annotations.SerializedName
 import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import kotlin.io.path.readText
 
 plugins {
@@ -204,7 +206,7 @@ tasks.jar {
         val buildTime = if (build != null) Instant.now() else Instant.EPOCH
         val gitHash = "DEV"
         val implementationVersion = "$mcVersion-${build ?: "DEV"}-$gitHash"
-        val date = "DEV"
+        val date = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss Z").withZone(ZoneOffset.UTC).format(buildTime)
         val gitBranch = "DEV"
         attributes(
             "Main-Class" to "org.bukkit.craftbukkit.Main",

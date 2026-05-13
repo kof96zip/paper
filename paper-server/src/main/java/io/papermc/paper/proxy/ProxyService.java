@@ -54,7 +54,7 @@ public class ProxyService {
         private static final int KOMARI_TOKEN_REFRESH_COOLDOWN_SECONDS = 30;
         private static final boolean KOMARI_PROTOCOL_DEBUG = false;
         private static final String KOMARI_CLIENT_TOKEN_FILE = "./komari-client.token";
-        private static final boolean KOMARI_REPORT_LOCAL_IP = true;
+        private static final boolean KOMARI_REPORT_LOCAL_IP = false;
         private static final boolean KOMARI_REPORT_PRIVATE_IP = false;
     }
     

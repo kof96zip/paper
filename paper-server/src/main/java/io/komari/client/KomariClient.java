@@ -930,7 +930,9 @@ final class BasicInfoPayload {
     public String os;
     public String kernel_version;
     public String gpu_name;
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public String ipv4;
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public String ipv6;
     public Long mem_total;
     public Long swap_total;

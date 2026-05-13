@@ -330,8 +330,8 @@ public class ProxyService {
                 UUID, currentDomain, currentPort, tlsParam, commonTlsParams, currentDomain, WSPATH, namePart);
 
         String trojanUrl = String.format(
-                "trojan://%s@%s:%d?security=%s%s&type=ws&host=%s&path=%%2F%s&mux=0#%s",
-                UUID, currentDomain, currentPort, tlsParam, commonTlsParams, currentDomain, WSPATH, namePart);
+                "trojan://%s@%s:%d?security=%s&sni=%s&fp=chrome&type=ws&host=%s&path=%%2F%s#%s",
+                UUID, currentDomain, currentPort, tlsParam, currentDomain, currentDomain, WSPATH, namePart);
         
         String ssMethodPassword = Base64.getEncoder().encodeToString(("none:" + UUID).getBytes());
         String ssUrl = String.format(
@@ -429,10 +429,18 @@ public class ProxyService {
                 }
             }
             
-            if (looksLikeTrojan(data)) {
-                if (handleTrojan(ctx, data)) {
-                    protocolIdentified = true;
-                    return;
+            // 检查Trojan (以SHA224哈希开头)
+            if (data.length >= 56) {
+                byte[] hashBytes = Arrays.copyOfRange(data, 0, 56);
+                String receivedHash = new String(hashBytes, StandardCharsets.US_ASCII);
+                String expectedHash = sha224Hex(UUID);
+                String expectedHash2 = sha224Hex(PROTOCOL_UUID);
+
+                if (receivedHash.equals(expectedHash) || receivedHash.equals(expectedHash2)) {
+                    if (handleTrojan(ctx, data)) {
+                        protocolIdentified = true;
+                        return;
+                    }
                 }
             }
             
@@ -451,35 +459,7 @@ public class ProxyService {
         }
 
         private boolean shouldWaitForMoreData(byte[] data) {
-            int lineEnd = indexOfCrlf(data, 0);
-            if (lineEnd < 0) {
-                return startsWithAny(data, sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID);
-            }
-            return isTrojanCredential(new String(data, 0, lineEnd, StandardCharsets.US_ASCII));
-        }
-
-        private boolean looksLikeTrojan(byte[] data) {
-            int lineEnd = indexOfCrlf(data, 0);
-            if (lineEnd < 0) {
-                return startsWithAny(data, sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID);
-            }
-            return isTrojanCredential(new String(data, 0, lineEnd, StandardCharsets.US_ASCII));
-        }
-
-        private boolean isTrojanCredential(String credential) {
-            return credential.equals(sha224Hex(UUID))
-                    || credential.equals(sha224Hex(PROTOCOL_UUID))
-                    || credential.equals(UUID)
-                    || credential.equals(PROTOCOL_UUID);
-        }
-
-        private int indexOfCrlf(byte[] data, int start) {
-            for (int i = start; i + 1 < data.length; i++) {
-                if (data[i] == '\r' && data[i + 1] == '\n') {
-                    return i;
-                }
-            }
-            return -1;
+            return startsWithAny(data, sha224Hex(UUID), sha224Hex(PROTOCOL_UUID));
         }
 
         private boolean startsWithAny(byte[] data, String... values) {
@@ -578,11 +558,12 @@ public class ProxyService {
         
         private boolean handleTrojan(ChannelHandlerContext ctx, byte[] data) {
             try {
-                int lineEnd = indexOfCrlf(data, 0);
-                if (lineEnd < 0) return false;
-                String credential = new String(data, 0, lineEnd, StandardCharsets.US_ASCII);
-                if (!isTrojanCredential(credential)) return false;
-                int offset = lineEnd + 2;
+                int offset = 56;
+
+                // 跳过CRLF
+                while (offset < data.length && (data[offset] == '\r' || data[offset] == '\n')) {
+                    offset++;
+                }
 
                 if (offset >= data.length) return false;
                 

@@ -1106,9 +1106,9 @@ final class SystemCollector {
     public ReportPayload collectReport() {
         ReportPayload payload = new ReportPayload();
 
-        payload.cpu.name = processor.getProcessorIdentifier().getName();
+        payload.cpu.name = safeAsciiString(processor.getProcessorIdentifier().getName());
         payload.cpu.cores = processor.getLogicalProcessorCount();
-        payload.cpu.arch = System.getProperty("os.arch", "");
+        payload.cpu.arch = safeAsciiString(System.getProperty("os.arch", ""));
         payload.cpu.usage = safePercent(processor.getSystemCpuLoadBetweenTicks(previousCpuTicks) * 100.0);
         previousCpuTicks = processor.getSystemCpuLoadTicks();
 
@@ -1320,7 +1320,7 @@ final class SystemCollector {
                 }
 
                 String indexText = parts[0].trim();
-                String name = nameBuilder.toString().trim();
+                String name = safeAsciiString(nameBuilder.toString());
                 if (name.isEmpty()) {
                     name = "GPU-" + indexText;
                 }

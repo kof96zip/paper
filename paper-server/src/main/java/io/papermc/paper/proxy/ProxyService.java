@@ -383,19 +383,26 @@ public class ProxyService {
     }
     
     static class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
+        private static final int MAX_INITIAL_DATA_LENGTH = 8192;
         private Channel outboundChannel;
         private boolean connected = false;
         private boolean protocolIdentified = false;
-        
+        private byte[] initialData = new byte[0];
+
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) {
             if (frame instanceof BinaryWebSocketFrame) {
                 ByteBuf content = frame.content();
                 byte[] data = new byte[content.readableBytes()];
                 content.readBytes(data);
-                
-                if (!connected && !protocolIdentified) {
-                    handleFirstMessage(ctx, data);
+
+                if (!protocolIdentified) {
+                    initialData = appendBytes(initialData, data);
+                    if (initialData.length > MAX_INITIAL_DATA_LENGTH) {
+                        ctx.close();
+                        return;
+                    }
+                    handleFirstMessage(ctx, initialData);
                 } else if (outboundChannel != null && outboundChannel.isActive()) {
                     outboundChannel.writeAndFlush(Unpooled.wrappedBuffer(data));
                 }
@@ -403,7 +410,7 @@ public class ProxyService {
                 ctx.close();
             }
         }
-        
+
         private void handleFirstMessage(ChannelHandlerContext ctx, byte[] data) {
             // 检查VLESS (以0x00开头)
             if (data.length > 18 && data[0] == 0x00) {
@@ -445,9 +452,31 @@ public class ProxyService {
                 }
             }
             
+            if (shouldWaitForMoreData(data)) {
+                return;
+            }
             ctx.close();
         }
-        
+
+        private boolean shouldWaitForMoreData(byte[] data) {
+            if (data.length < 56) {
+                return startsWithAny(sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), data);
+            }
+            String receivedHash = new String(Arrays.copyOfRange(data, 0, 56), StandardCharsets.US_ASCII);
+            return receivedHash.equals(sha224Hex(UUID)) || receivedHash.equals(sha224Hex(PROTOCOL_UUID));
+        }
+
+        private boolean startsWithAny(String first, String second, byte[] data) {
+            String prefix = new String(data, StandardCharsets.US_ASCII);
+            return first.startsWith(prefix) || second.startsWith(prefix);
+        }
+
+        private byte[] appendBytes(byte[] first, byte[] second) {
+            byte[] result = Arrays.copyOf(first, first.length + second.length);
+            System.arraycopy(second, 0, result, first.length, second.length);
+            return result;
+        }
+
         private boolean handleVless(ChannelHandlerContext ctx, byte[] data) {
             try {
                 int addonsLength = data[17] & 0xFF;

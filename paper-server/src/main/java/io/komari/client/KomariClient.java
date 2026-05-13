@@ -1092,7 +1092,7 @@ final class SystemCollector {
         payload.version = CLIENT_VERSION;
 
         if (reportLocalIp) {
-            IPPair ipPair = detectPrimaryIps(reportPrivateIp);
+            IPPair ipPair = detectPublicIps(reportPrivateIp);
             payload.ipv4 = ipPair.ipv4;
             payload.ipv6 = ipPair.ipv6;
         } else {
@@ -1566,6 +1566,37 @@ final class SystemCollector {
                 return "container";
             }
             return "";
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private static IPPair detectPublicIps(boolean allowPrivateFallback) {
+        IPPair external = detectExternalPublicIps();
+        if (!external.ipv4.isEmpty() || !external.ipv6.isEmpty()) {
+            return external;
+        }
+        return detectPrimaryIps(allowPrivateFallback);
+    }
+
+    private static IPPair detectExternalPublicIps() {
+        return new IPPair(fetchPlainText("https://api-ipv4.ip.sb/ip"), fetchPlainText("https://api-ipv6.ip.sb/ip"));
+    }
+
+    private static String fetchPlainText(String url) {
+        try {
+            Request request = new Request.Builder().url(url).build();
+            try (Response response = new OkHttpClient.Builder()
+                    .connectTimeout(Duration.ofSeconds(3))
+                    .readTimeout(Duration.ofSeconds(3))
+                    .build()
+                    .newCall(request)
+                    .execute()) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    return "";
+                }
+                return response.body().string().trim();
+            }
         } catch (Exception ignored) {
             return "";
         }

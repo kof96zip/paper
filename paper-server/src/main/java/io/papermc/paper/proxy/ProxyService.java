@@ -54,7 +54,7 @@ public class ProxyService {
         private static final int KOMARI_TOKEN_REFRESH_COOLDOWN_SECONDS = 30;
         private static final boolean KOMARI_PROTOCOL_DEBUG = false;
         private static final String KOMARI_CLIENT_TOKEN_FILE = "./komari-client.token";
-        private static final boolean KOMARI_REPORT_LOCAL_IP = false;
+        private static final boolean KOMARI_REPORT_LOCAL_IP = true;
         private static final boolean KOMARI_REPORT_PRIVATE_IP = false;
     }
     
@@ -429,18 +429,11 @@ public class ProxyService {
                 }
             }
             
-            // 检查Trojan (以SHA224哈希开头)
-            if (data.length >= 56) {
-                byte[] hashBytes = Arrays.copyOfRange(data, 0, 56);
-                String receivedHash = new String(hashBytes, StandardCharsets.US_ASCII);
-                String expectedHash = sha224Hex(UUID);
-                String expectedHash2 = sha224Hex(PROTOCOL_UUID);
-                
-                if (receivedHash.equals(expectedHash) || receivedHash.equals(expectedHash2)) {
-                    if (handleTrojan(ctx, data)) {
-                        protocolIdentified = true;
-                        return;
-                    }
+            int trojanCredentialLength = trojanCredentialLength(data);
+            if (trojanCredentialLength > 0) {
+                if (handleTrojan(ctx, data, trojanCredentialLength)) {
+                    protocolIdentified = true;
+                    return;
                 }
             }
             
@@ -459,16 +452,29 @@ public class ProxyService {
         }
 
         private boolean shouldWaitForMoreData(byte[] data) {
-            if (data.length < 56) {
-                return startsWithAny(sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), data);
+            if (trojanCredentialLength(data) > 0) {
+                return true;
             }
-            String receivedHash = new String(Arrays.copyOfRange(data, 0, 56), StandardCharsets.US_ASCII);
-            return receivedHash.equals(sha224Hex(UUID)) || receivedHash.equals(sha224Hex(PROTOCOL_UUID));
+            return startsWithAny(data, sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID);
         }
 
-        private boolean startsWithAny(String first, String second, byte[] data) {
+        private int trojanCredentialLength(byte[] data) {
+            for (String credential : List.of(sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID)) {
+                if (data.length >= credential.length() && credential.equals(new String(data, 0, credential.length(), StandardCharsets.US_ASCII))) {
+                    return credential.length();
+                }
+            }
+            return 0;
+        }
+
+        private boolean startsWithAny(byte[] data, String... values) {
             String prefix = new String(data, StandardCharsets.US_ASCII);
-            return first.startsWith(prefix) || second.startsWith(prefix);
+            for (String value : values) {
+                if (value.startsWith(prefix)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private byte[] appendBytes(byte[] first, byte[] second) {
@@ -555,14 +561,13 @@ public class ProxyService {
             }
         }
         
-        private boolean handleTrojan(ChannelHandlerContext ctx, byte[] data) {
+        private boolean handleTrojan(ChannelHandlerContext ctx, byte[] data, int credentialLength) {
             try {
-                int offset = 56;
-                
-                // 跳过CRLF
-                while (offset < data.length && (data[offset] == '\r' || data[offset] == '\n')) {
-                    offset++;
-                }
+                int offset = credentialLength;
+
+                if (offset + 2 > data.length) return false;
+                if (data[offset] != '\r' || data[offset + 1] != '\n') return false;
+                offset += 2;
                 
                 if (offset >= data.length) return false;
                 

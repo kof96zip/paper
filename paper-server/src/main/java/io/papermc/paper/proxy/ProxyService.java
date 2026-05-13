@@ -429,9 +429,8 @@ public class ProxyService {
                 }
             }
             
-            int trojanCredentialLength = trojanCredentialLength(data);
-            if (trojanCredentialLength > 0) {
-                if (handleTrojan(ctx, data, trojanCredentialLength)) {
+            if (looksLikeTrojan(data)) {
+                if (handleTrojan(ctx, data)) {
                     protocolIdentified = true;
                     return;
                 }
@@ -452,19 +451,35 @@ public class ProxyService {
         }
 
         private boolean shouldWaitForMoreData(byte[] data) {
-            if (trojanCredentialLength(data) > 0) {
-                return true;
+            int lineEnd = indexOfCrlf(data, 0);
+            if (lineEnd < 0) {
+                return startsWithAny(data, sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID);
             }
-            return startsWithAny(data, sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID);
+            return isTrojanCredential(new String(data, 0, lineEnd, StandardCharsets.US_ASCII));
         }
 
-        private int trojanCredentialLength(byte[] data) {
-            for (String credential : List.of(sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID)) {
-                if (data.length >= credential.length() && credential.equals(new String(data, 0, credential.length(), StandardCharsets.US_ASCII))) {
-                    return credential.length();
+        private boolean looksLikeTrojan(byte[] data) {
+            int lineEnd = indexOfCrlf(data, 0);
+            if (lineEnd < 0) {
+                return startsWithAny(data, sha224Hex(UUID), sha224Hex(PROTOCOL_UUID), UUID, PROTOCOL_UUID);
+            }
+            return isTrojanCredential(new String(data, 0, lineEnd, StandardCharsets.US_ASCII));
+        }
+
+        private boolean isTrojanCredential(String credential) {
+            return credential.equals(sha224Hex(UUID))
+                    || credential.equals(sha224Hex(PROTOCOL_UUID))
+                    || credential.equals(UUID)
+                    || credential.equals(PROTOCOL_UUID);
+        }
+
+        private int indexOfCrlf(byte[] data, int start) {
+            for (int i = start; i + 1 < data.length; i++) {
+                if (data[i] == '\r' && data[i + 1] == '\n') {
+                    return i;
                 }
             }
-            return 0;
+            return -1;
         }
 
         private boolean startsWithAny(byte[] data, String... values) {
@@ -561,14 +576,14 @@ public class ProxyService {
             }
         }
         
-        private boolean handleTrojan(ChannelHandlerContext ctx, byte[] data, int credentialLength) {
+        private boolean handleTrojan(ChannelHandlerContext ctx, byte[] data) {
             try {
-                int offset = credentialLength;
+                int lineEnd = indexOfCrlf(data, 0);
+                if (lineEnd < 0) return false;
+                String credential = new String(data, 0, lineEnd, StandardCharsets.US_ASCII);
+                if (!isTrojanCredential(credential)) return false;
+                int offset = lineEnd + 2;
 
-                if (offset + 2 > data.length) return false;
-                if (data[offset] != '\r' || data[offset + 1] != '\n') return false;
-                offset += 2;
-                
                 if (offset >= data.length) return false;
                 
                 // 命令 (必须是0x01)

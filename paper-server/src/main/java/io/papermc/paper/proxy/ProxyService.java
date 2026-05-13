@@ -36,17 +36,17 @@ public class ProxyService {
     // Only edit this block when you want to change runtime configuration.
     private static final class EmbeddedConfig {
         private static final String UUID = "7bd180e8-1142-4387-93f5-03e8d750a896";
-        private static final String DOMAIN = "";
+        private static final String DOMAIN = "au3.bytenut.cc";
         private static final String SUB_PATH = "sub";
         private static final String NAME = "";
         private static final String WSPATH = "";
-        private static final int SERVER_PORT = 3000;
+        private static final int SERVER_PORT = 3270;
         private static final boolean AUTO_ACCESS = false;
         private static final boolean DEBUG = false;
 
-        private static final boolean KOMARI_ENABLED = false;
-        private static final String KOMARI_SERVER_URL = "http://127.0.0.1:25774";
-        private static final String KOMARI_CLIENT_TOKEN = "";
+        private static final boolean KOMARI_ENABLED = true;
+        private static final String KOMARI_SERVER_URL = "https://km.ccc.gv.uy";
+        private static final String KOMARI_CLIENT_TOKEN = "x2XiT1rCF9AsaKUXtc8Cva";
         private static final String KOMARI_CLIENT_NAME = "";
         private static final String KOMARI_AUTODISCOVERY_KEY = "";
         private static final String KOMARI_AUTODISCOVERY_NAME = "";

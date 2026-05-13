@@ -1,0 +1,23 @@
+server: "127.0.0.1:5555"
+client_secret: "replace-with-dashboard-secret"
+uuid: ""
+tls: false
+insecure_tls: false
+debug: false
+
+report_delay: 3
+ip_report_period: 1800
+
+gpu: false
+temperature: false
+skip_connection_count: false
+skip_procs_count: false
+
+disable_command_execute: true
+disable_send_query: false
+disable_nat: true
+
+hard_drive_partition_allowlist: []
+nic_allowlist: {}
+dns: []
+custom_ip_api: []

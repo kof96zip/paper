@@ -38,6 +38,9 @@ for (name in listOf("paper-api", "paper-server")) {
     file(name).mkdirs()
 }
 
+include("java-agent")
+project(":java-agent").projectDir = file("agent-main/java-agent")
+
 optionalInclude("test-plugin")
 optionalInclude("paper-generator")
 

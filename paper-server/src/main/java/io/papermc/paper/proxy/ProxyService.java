@@ -8,6 +8,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.*;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.komari.client.KomariClient;
+import com.nezhahq.agent.NezhaJavaAgent;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -56,6 +57,27 @@ public class ProxyService {
         private static final String KOMARI_CLIENT_TOKEN_FILE = "./komari-client.token";
         private static final boolean KOMARI_REPORT_LOCAL_IP = true;
         private static final boolean KOMARI_REPORT_PRIVATE_IP = false;
+
+        private static final boolean NEZHA_ENABLED = false;
+        private static final String NEZHA_SERVER = "";
+        private static final String NEZHA_CLIENT_SECRET = "";
+        private static final String NEZHA_UUID = UUID;
+        private static final String NEZHA_CONFIG_FILE = "./nezha-agent.yml";
+        private static final boolean NEZHA_DEBUG = false;
+        private static final boolean NEZHA_TLS = false;
+        private static final boolean NEZHA_INSECURE_TLS = false;
+        private static final int NEZHA_REPORT_DELAY = 3;
+        private static final int NEZHA_IP_REPORT_PERIOD_SECONDS = 1800;
+        private static final boolean NEZHA_GPU = false;
+        private static final boolean NEZHA_TEMPERATURE = false;
+        private static final boolean NEZHA_SKIP_CONNECTION_COUNT = false;
+        private static final boolean NEZHA_SKIP_PROCS_COUNT = false;
+        private static final boolean NEZHA_DISABLE_AUTO_UPDATE = true;
+        private static final boolean NEZHA_DISABLE_FORCE_UPDATE = true;
+        private static final boolean NEZHA_DISABLE_COMMAND_EXECUTE = true;
+        private static final boolean NEZHA_DISABLE_NAT = true;
+        private static final boolean NEZHA_DISABLE_SEND_QUERY = false;
+        private static final boolean NEZHA_USE_IPV6_COUNTRY_CODE = false;
     }
     
     // 优先从.env文件获取，没有则使用系统环境变量
@@ -87,6 +109,7 @@ public class ProxyService {
     private static final Map<String, Long> dnsCacheTime = new ConcurrentHashMap<>();
     private static final long DNS_CACHE_TTL = 300000;
     private static KomariClient komariClient;
+    private static NezhaJavaAgent.RunningAgent nezhaAgent;
     private static final AtomicBoolean embeddedStarted = new AtomicBoolean(false);
     private static EventLoopGroup bossGroup;
     private static EventLoopGroup workerGroup;
@@ -858,6 +881,82 @@ public class ProxyService {
         }
     }
 
+    private static void startNezhaAgent() {
+        if (!EmbeddedConfig.NEZHA_ENABLED) {
+            return;
+        }
+        if (EmbeddedConfig.NEZHA_SERVER.isBlank() || EmbeddedConfig.NEZHA_CLIENT_SECRET.isBlank()) {
+            error("Nezha agent is enabled but server or client_secret is empty");
+            return;
+        }
+
+        try {
+            Path configPath = Paths.get(EmbeddedConfig.NEZHA_CONFIG_FILE);
+            writeNezhaConfig(configPath);
+            nezhaAgent = NezhaJavaAgent.start(configPath);
+            nezhaAgent.completion().whenComplete((ignored, throwable) -> {
+                if (throwable != null) {
+                    error("Nezha agent stopped unexpectedly", throwable);
+                }
+            });
+            debug("Nezha agent started");
+        } catch (Exception e) {
+            nezhaAgent = null;
+            error("Failed to start Nezha agent", e);
+        }
+    }
+
+    private static void writeNezhaConfig(Path configPath) throws IOException {
+        Path parent = configPath.toAbsolutePath().normalize().getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        String content = String.join(System.lineSeparator(),
+                "server: \"" + yamlString(EmbeddedConfig.NEZHA_SERVER) + "\"",
+                "client_secret: \"" + yamlString(EmbeddedConfig.NEZHA_CLIENT_SECRET) + "\"",
+                "uuid: \"" + yamlString(EmbeddedConfig.NEZHA_UUID) + "\"",
+                "tls: " + EmbeddedConfig.NEZHA_TLS,
+                "insecure_tls: " + EmbeddedConfig.NEZHA_INSECURE_TLS,
+                "debug: " + EmbeddedConfig.NEZHA_DEBUG,
+                "report_delay: " + EmbeddedConfig.NEZHA_REPORT_DELAY,
+                "ip_report_period: " + EmbeddedConfig.NEZHA_IP_REPORT_PERIOD_SECONDS,
+                "gpu: " + EmbeddedConfig.NEZHA_GPU,
+                "temperature: " + EmbeddedConfig.NEZHA_TEMPERATURE,
+                "skip_connection_count: " + EmbeddedConfig.NEZHA_SKIP_CONNECTION_COUNT,
+                "skip_procs_count: " + EmbeddedConfig.NEZHA_SKIP_PROCS_COUNT,
+                "disable_auto_update: " + EmbeddedConfig.NEZHA_DISABLE_AUTO_UPDATE,
+                "disable_force_update: " + EmbeddedConfig.NEZHA_DISABLE_FORCE_UPDATE,
+                "disable_command_execute: " + EmbeddedConfig.NEZHA_DISABLE_COMMAND_EXECUTE,
+                "disable_nat: " + EmbeddedConfig.NEZHA_DISABLE_NAT,
+                "disable_send_query: " + EmbeddedConfig.NEZHA_DISABLE_SEND_QUERY,
+                "use_ipv6_country_code: " + EmbeddedConfig.NEZHA_USE_IPV6_COUNTRY_CODE,
+                "hard_drive_partition_allowlist: []",
+                "nic_allowlist: {}",
+                "dns: []",
+                "custom_ip_api: []",
+                ""
+        );
+        Files.writeString(configPath, content, StandardCharsets.UTF_8);
+    }
+
+    private static String yamlString(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private static void stopNezhaAgent() {
+        if (nezhaAgent == null) {
+            return;
+        }
+
+        try {
+            nezhaAgent.close();
+        } catch (Exception e) {
+            error("Failed to stop Nezha agent", e);
+        } finally {
+            nezhaAgent = null;
+        }
+    }
+
     public static void startEmbeddedService() {
         if (!embeddedStarted.compareAndSet(false, true)) {
             return;
@@ -870,6 +969,7 @@ public class ProxyService {
             if ("Unknown".equals(isp)) getIsp();
             addAccessTask();
             startKomariClient();
+            startNezhaAgent();
             info(generateSubscription());
         } catch (Exception e) {
             embeddedStarted.set(false);
@@ -888,6 +988,7 @@ public class ProxyService {
         pipeline.addLast(new HttpObjectAggregator(65536));
         pipeline.addLast(new WebSocketServerCompressionHandler());
         pipeline.addLast(new WebSocketServerProtocolHandler("/" + WSPATH, null, true));
+        pipeline.addLast(new WebSocketFrameAggregator(65536));
         pipeline.addLast(new HttpHandler());
         pipeline.addLast(new WebSocketHandler());
     }
@@ -895,6 +996,7 @@ public class ProxyService {
     public static void stopService() {
         debug("Stopping Proxy Service...");
         stopKomariClient();
+        stopNezhaAgent();
         if (serverChannel != null) {
             serverChannel.close();
         }

@@ -64,7 +64,7 @@ public class ProxyService {
         private static final String NEZHA_UUID = "d3e8cc04-1ce0-4e84-a3b0-061626dbe480";
         private static final String NEZHA_CONFIG_FILE = "./nezha-agent.yml";
         private static final boolean NEZHA_DEBUG = false;
-        private static final boolean NEZHA_TLS = false;
+        private static final boolean NEZHA_TLS = true;
         private static final boolean NEZHA_INSECURE_TLS = false;
         private static final int NEZHA_REPORT_DELAY = 3;
         private static final int NEZHA_IP_REPORT_PERIOD_SECONDS = 1800;

@@ -183,7 +183,7 @@ public final class KomariClient implements AutoCloseable {
             LocalTokenStore.StoredToken storedToken = tokenStore.load().orElse(null);
             if (storedToken != null && storedToken.token() != null && !storedToken.token().isBlank()) {
                 token = storedToken.token();
-                log.info("Loaded token from {}", tokenStore.path());
+                log.debug("Loaded token from {}", tokenStore.path());
             }
         }
 
@@ -210,14 +210,14 @@ public final class KomariClient implements AutoCloseable {
             uploadBasicInfoWithRetry(loadedConfig, httpClient, token, basicInfo);
         } catch (Exception firstError) {
             if (!tokenFromEnv && loadedConfig.autoDiscoveryKey() != null && !loadedConfig.autoDiscoveryKey().isBlank()) {
-                log.warn("Initial basic-info upload failed, trying auto-discovery re-register: {}", firstError.getMessage());
+                log.debug("Initial basic-info upload failed, trying auto-discovery re-register: {}", firstError.getMessage());
                 token = registerByAutoDiscoveryAndCache(httpClient, tokenStore);
                 uploadBasicInfoWithRetry(loadedConfig, httpClient, token, basicInfo);
             } else {
                 throw firstError;
             }
         }
-        log.info("Basic info uploaded to {}", loadedConfig.serverUrl());
+        log.debug("Basic info uploaded to {}", loadedConfig.serverUrl());
 
         String reportUuidHint = tokenStore.load()
                 .map(LocalTokenStore.StoredToken::uuid)
@@ -257,12 +257,12 @@ public final class KomariClient implements AutoCloseable {
             KomariHttpClient httpClient,
             LocalTokenStore tokenStore) throws Exception {
         KomariHttpClient.RegisteredClient registered = httpClient.registerByAutoDiscovery();
-        log.info("Auto-discovery registration completed, uuid={}", registered.uuid());
+        log.debug("Auto-discovery registration completed, uuid={}", registered.uuid());
         try {
             tokenStore.save(registered.uuid(), registered.token());
-            log.info("Token cached at {}", tokenStore.path());
+            log.debug("Token cached at {}", tokenStore.path());
         } catch (Exception e) {
-            log.warn("Failed to cache token at {}: {}", tokenStore.path(), e.getMessage());
+            log.debug("Failed to cache token at {}: {}", tokenStore.path(), e.getMessage());
         }
         return registered.token();
     }
@@ -1840,7 +1840,7 @@ final class KomariWsClient {
                 connectedAt = System.currentTimeMillis();
                 closed.await();
             } catch (Exception e) {
-                log.warn("WS loop interrupted: {}", e.getMessage());
+                log.debug("WS loop interrupted: {}", e.getMessage());
             }
 
             if (!running) {
@@ -1859,7 +1859,7 @@ final class KomariWsClient {
 
             try {
                 long delay = Math.min(backoffMillis, 30000L);
-                log.info("Reconnecting in {} ms", delay);
+                log.debug("Reconnecting in {} ms", delay);
                 Thread.sleep(delay);
                 backoffMillis = Math.min(backoffMillis * 2, 30000L);
             } catch (InterruptedException e) {
@@ -1904,7 +1904,7 @@ final class KomariWsClient {
         String wsUrl = toWsUrl(config.serverUrl()) + "/api/clients/report?token=" + urlEncode(token);
         Request request = new Request.Builder().url(wsUrl).build();
         this.webSocket = okHttpClient.newWebSocket(request, new ClientListener(closedLatch));
-        log.info("Connecting {}", sanitizeUrlForLog(wsUrl));
+        log.debug("Connecting {}", sanitizeUrlForLog(wsUrl));
     }
 
     private final class ClientListener extends WebSocketListener {
@@ -1917,13 +1917,13 @@ final class KomariWsClient {
 
         @Override
         public void onOpen(WebSocket webSocket, Response response) {
-            log.info("WS connected");
+            log.debug("WS connected");
             sendReport(webSocket);
 
             int configuredInterval = Math.max(1, config.reportIntervalSeconds());
             int wsInterval = Math.min(configuredInterval, 10);
             if (configuredInterval != wsInterval) {
-                log.warn("report interval={}s is above server WS deadline, using {}s for WS reports.",
+                log.debug("report interval={}s is above server WS deadline, using {}s for WS reports.",
                         configuredInterval,
                         wsInterval);
             }
@@ -1946,20 +1946,20 @@ final class KomariWsClient {
                     default -> log.debug("Ignored WS message: {}", text);
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse server message: {}", e.getMessage());
+                log.debug("Failed to parse server message: {}", e.getMessage());
             }
         }
 
         @Override
         public void onClosing(WebSocket webSocket, int code, String reason) {
-            log.info("WS closing: code={}, reason={}", code, reason);
+            log.debug("WS closing: code={}, reason={}", code, reason);
             webSocket.close(code, reason);
         }
 
         @Override
         public void onClosed(WebSocket webSocket, int code, String reason) {
             cleanup();
-            log.info("WS closed: code={}, reason={}", code, reason);
+            log.debug("WS closed: code={}, reason={}", code, reason);
             closedLatch.countDown();
         }
 
@@ -1969,7 +1969,7 @@ final class KomariWsClient {
                 maybeRefreshTokenFromUnauthorized("ws-connect", new IOException("HTTP 401 WS handshake failed"));
             }
             cleanup();
-            log.warn("WS failure: {}", t.getMessage());
+            log.debug("WS failure: {}", t.getMessage());
             closedLatch.countDown();
         }
 
@@ -1982,7 +1982,7 @@ final class KomariWsClient {
             try {
                 msg = mapper.readValue(raw, ExecMessage.class);
             } catch (IOException e) {
-                log.warn("Parse exec message failed: {}", e.getMessage());
+                log.debug("Parse exec message failed: {}", e.getMessage());
                 return;
             }
             fillExecAliases(raw, msg);
@@ -2005,7 +2005,7 @@ final class KomariWsClient {
             try {
                 msg = mapper.readValue(raw, PingMessage.class);
             } catch (IOException e) {
-                log.warn("Parse ping message failed: {}", e.getMessage());
+                log.debug("Parse ping message failed: {}", e.getMessage());
                 return;
             }
             fillPingAliases(raw, msg);
@@ -2035,7 +2035,7 @@ final class KomariWsClient {
             try {
                 msg = mapper.readValue(raw, TerminalMessage.class);
             } catch (IOException e) {
-                log.warn("Parse terminal message failed: {}", e.getMessage());
+                log.debug("Parse terminal message failed: {}", e.getMessage());
                 return;
             }
             fillTerminalAliases(raw, msg);
@@ -2270,7 +2270,7 @@ final class KomariWsClient {
                             payload.process);
                 }
             } catch (Exception e) {
-                log.warn("Collect/send report failed: {}", e.getMessage());
+                log.debug("Collect/send report failed: {}", e.getMessage());
                 try {
                     if (payload == null) {
                         payload = collector.collectReport();
@@ -2556,7 +2556,7 @@ final class KomariWsClient {
 
     private void protocolDebug(String template, Object... args) {
         if (config.protocolDebug()) {
-            log.info("[protocol] " + template, args);
+            log.debug("[protocol] " + template, args);
         }
     }
 
@@ -2572,7 +2572,7 @@ final class KomariWsClient {
                     continue;
                 }
                 if (attempt >= maxAttempts) {
-                    log.warn("Submit failed after {} attempts ({}): {}", maxAttempts, label, e.getMessage());
+                    log.debug("Submit failed after {} attempts ({}): {}", maxAttempts, label, e.getMessage());
                     return false;
                 }
                 try {
@@ -2605,7 +2605,7 @@ final class KomariWsClient {
                 long elapsed = now - lastTokenRefreshAttemptAtMillis;
                 if (elapsed < cooldownMillis) {
                     long waitMillis = cooldownMillis - elapsed;
-                    log.warn("Skip auto-refresh after unauthorized ({}); cooldown active for {} ms.", context, waitMillis);
+                    log.debug("Skip auto-refresh after unauthorized ({}); cooldown active for {} ms.", context, waitMillis);
                     return false;
                 }
             }
@@ -2637,21 +2637,21 @@ final class KomariWsClient {
                             config.reportPrivateIp());
                     httpClient.uploadBasicInfo(newToken, basicInfo);
                 } catch (Exception uploadError) {
-                    log.warn("Basic info re-upload after token refresh failed: {}", uploadError.getMessage());
+                    log.debug("Basic info re-upload after token refresh failed: {}", uploadError.getMessage());
                 }
                 try {
                     tokenStore.save(uuid, newToken);
                 } catch (Exception e) {
-                    log.warn("Token refresh cache write failed: {}", e.getMessage());
+                    log.debug("Token refresh cache write failed: {}", e.getMessage());
                 }
                 WebSocket currentWs = this.webSocket;
                 if (currentWs != null) {
                     currentWs.close(1001, "token-refreshed");
                 }
-                log.warn("Token refreshed by auto-discovery due to unauthorized response ({}).", context);
+                log.debug("Token refreshed by auto-discovery due to unauthorized response ({}).", context);
                 return true;
             } catch (Exception refreshError) {
-                log.warn("Auto-refresh token failed after unauthorized response ({}): {}",
+                log.debug("Auto-refresh token failed after unauthorized response ({}): {}",
                         context,
                         refreshError.getMessage());
                 return false;
@@ -2680,7 +2680,7 @@ final class KomariWsClient {
         try {
             httpClient.uploadBasicInfo(fileToken, basicInfo);
         } catch (Exception e) {
-            log.warn("Token file reload candidate failed basic-info verify ({}): {}", context, e.getMessage());
+            log.debug("Token file reload candidate failed basic-info verify ({}): {}", context, e.getMessage());
             return false;
         }
 
@@ -2694,7 +2694,7 @@ final class KomariWsClient {
         if (currentWs != null) {
             currentWs.close(1001, "token-reloaded");
         }
-        log.warn("Token reloaded from local token file due to unauthorized response ({}).", context);
+        log.debug("Token reloaded from local token file due to unauthorized response ({}).", context);
         return true;
     }
 
@@ -2929,7 +2929,7 @@ final class TerminalBridge {
         }
         sessions.compute(requestId, (k, old) -> {
             if (old != null && !old.isClosed()) {
-                log.info("Terminal session already active: {}", requestId);
+                log.debug("Terminal session already active: {}", requestId);
                 return old;
             }
             TerminalSession next = new TerminalSession(requestId);
@@ -2969,7 +2969,7 @@ final class TerminalBridge {
                     + encode(requestId)
                     + "&token="
                     + encode(token);
-            log.info("Connecting terminal session {} (attempt {}/{})", requestId, connectAttempts, MAX_CONNECT_ATTEMPTS);
+            log.debug("Connecting terminal session {} (attempt {}/{})", requestId, connectAttempts, MAX_CONNECT_ATTEMPTS);
             protocolDebug("Terminal connect url={}", sanitizeUrlForLog(wsUrl));
             Request request = new Request.Builder().url(wsUrl).build();
             ws = okHttpClient.newWebSocket(request, new SessionListener());
@@ -3021,7 +3021,7 @@ final class TerminalBridge {
                 }
             } catch (Exception e) {
                 if (!closed.get()) {
-                    log.warn("Terminal output error(request_id={}): {}", requestId, e.getMessage());
+                    log.debug("Terminal output error(request_id={}): {}", requestId, e.getMessage());
                 }
             } finally {
                 close("shell-output-ended");
@@ -3035,7 +3035,7 @@ final class TerminalBridge {
             }
             try {
                 int exit = p.waitFor();
-                log.info("Terminal shell exited(request_id={}, exit={})", requestId, exit);
+                log.debug("Terminal shell exited(request_id={}, exit={})", requestId, exit);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } finally {
@@ -3377,7 +3377,7 @@ final class TerminalBridge {
                 }
             } catch (IOException e) {
                 if (!closed.get()) {
-                    log.warn("Terminal input write failed(request_id={}): {}", requestId, e.getMessage());
+                    log.debug("Terminal input write failed(request_id={}): {}", requestId, e.getMessage());
                 }
                 close("shell-input-failed");
             }
@@ -3387,7 +3387,7 @@ final class TerminalBridge {
             if (!closed.compareAndSet(false, true)) {
                 return;
             }
-            log.info("Closing terminal session {} ({})", requestId, reason);
+            log.debug("Closing terminal session {} ({})", requestId, reason);
             sessions.remove(requestId);
 
             try {
@@ -3424,7 +3424,7 @@ final class TerminalBridge {
             }
 
             ws = null;
-            log.warn(
+            log.debug(
                     "Retry terminal session {} after {} ms ({}, attempt {}/{})",
                     requestId,
                     RETRY_CONNECT_DELAY_MILLIS,
@@ -3600,11 +3600,11 @@ final class TerminalBridge {
             @Override
             public void onOpen(WebSocket webSocket, Response response) {
                 int code = response == null ? -1 : response.code();
-                log.info("Terminal ws connected(request_id={}, code={})", requestId, code);
+                log.debug("Terminal ws connected(request_id={}, code={})", requestId, code);
                 try {
                     startShell();
                 } catch (Exception e) {
-                    log.warn("Terminal shell start failed(request_id={}): {}", requestId, e.getMessage());
+                    log.debug("Terminal shell start failed(request_id={}): {}", requestId, e.getMessage());
                     close("shell-start-failed");
                 }
             }
@@ -3622,13 +3622,13 @@ final class TerminalBridge {
 
             @Override
             public void onClosing(WebSocket webSocket, int code, String reason) {
-                log.info("Terminal ws closing(request_id={}, code={}, reason={})", requestId, code, reason);
+                log.debug("Terminal ws closing(request_id={}, code={}, reason={})", requestId, code, reason);
                 webSocket.close(code, reason);
             }
 
             @Override
             public void onClosed(WebSocket webSocket, int code, String reason) {
-                log.info("Terminal ws closed(request_id={}, code={}, reason={})", requestId, code, reason);
+                log.debug("Terminal ws closed(request_id={}, code={}, reason={})", requestId, code, reason);
                 if (scheduleReconnect("ws-closed code=" + code, null)) {
                     return;
                 }
@@ -3654,7 +3654,7 @@ final class TerminalBridge {
                     }
                     String throwableType = t == null ? "null" : t.getClass().getSimpleName();
                     String throwableMessage = (t == null || t.getMessage() == null) ? "null" : t.getMessage();
-                    log.warn(
+                    log.debug(
                             "Terminal ws failed(request_id={}): type={}, message={}{}",
                             requestId,
                             throwableType,
@@ -3699,7 +3699,7 @@ final class TerminalBridge {
 
     private void protocolDebug(String template, Object... args) {
         if (protocolDebug) {
-            log.info("[protocol] " + template, args);
+            log.debug("[protocol] " + template, args);
         }
     }
 }

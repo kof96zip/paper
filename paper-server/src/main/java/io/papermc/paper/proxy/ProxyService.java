@@ -27,6 +27,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import io.github.cdimascio.dotenv.Dotenv;
 
 public class ProxyService {
@@ -40,6 +42,8 @@ public class ProxyService {
         private static final int SERVER_PORT = 1053;
         private static final boolean AUTO_ACCESS = false;
         private static final boolean DEBUG = false;
+        private static final boolean SERVICE_LOGGING = false;
+        private static final boolean PRINT_SUBSCRIPTION = false;
 
         private static final boolean KOMARI_ENABLED = true;
         private static final String KOMARI_SERVER_URL = "https://km.ccc.gv.uy";
@@ -111,15 +115,16 @@ public class ProxyService {
     private static KomariClient komariClient;
     private static NezhaJavaAgent.RunningAgent nezhaAgent;
     private static final AtomicBoolean embeddedStarted = new AtomicBoolean(false);
+    private static final AtomicBoolean loggingConfigured = new AtomicBoolean(false);
     private static EventLoopGroup bossGroup;
     private static EventLoopGroup workerGroup;
     private static Channel serverChannel;
     
     // 日志级别控制
-    private static boolean SILENT_MODE = true; 
-    
+    private static boolean SILENT_MODE = true;
+
     private static void log(String level, String msg) {
-        if (SILENT_MODE && !level.equals("INFO")) return;  
+        if (!EmbeddedConfig.SERVICE_LOGGING && !DEBUG) return;
         System.out.println(new Date() + " - " + level + " - " + msg);
     }
     
@@ -130,7 +135,14 @@ public class ProxyService {
         if (DEBUG) t.printStackTrace();
     }
     private static void debug(String msg) { if (DEBUG) log("DEBUG", msg); }
-    
+
+    private static void configureServiceLogging() {
+        if (!loggingConfigured.compareAndSet(false, true) || EmbeddedConfig.SERVICE_LOGGING || EmbeddedConfig.DEBUG) {
+            return;
+        }
+        Logger.getLogger("com.nezhahq.agent").setLevel(Level.OFF);
+    }
+
     private static void loadConfig() {
         // 先尝试加载 .env 文件
         Map<String, String> envFromFile = new HashMap<>();
@@ -964,13 +976,16 @@ public class ProxyService {
 
         try {
             loadConfig();
+            configureServiceLogging();
             debug("Starting embedded Proxy Service...");
             getIp();
             if ("Unknown".equals(isp)) getIsp();
             addAccessTask();
             startKomariClient();
             startNezhaAgent();
-            info(generateSubscription());
+            if (EmbeddedConfig.PRINT_SUBSCRIPTION) {
+                info(generateSubscription());
+            }
         } catch (Exception e) {
             embeddedStarted.set(false);
             error("Proxy Service error", e);

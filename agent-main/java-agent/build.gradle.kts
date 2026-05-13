@@ -20,7 +20,6 @@ dependencies {
     implementation("org.jetbrains.pty4j:pty4j:0.13.5")
     implementation("org.yaml:snakeyaml:2.2")
     implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
-    implementation("org.slf4j:slf4j-simple:2.0.13")
     compileOnly("javax.annotation:javax.annotation-api:1.3.2")
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
 }

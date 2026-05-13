@@ -658,7 +658,7 @@ public static final class NezhaAgentClient {
                 try {
                     runOnce();
                 } catch (Exception error) {
-                    if (running.get()) {
+                    if (running.get() && config.isDebug()) {
                         LOGGER.log(Level.WARNING, "Agent worker failed, reconnecting", error);
                     }
                 } finally {
@@ -719,7 +719,9 @@ public static final class NezhaAgentClient {
         TaskHandler taskHandler = new TaskHandler(() -> config, configPath, this::replaceConfig, streamTaskRunner);
 
         updateGeoForceFlag(reportHost(blockingStub, monitor), geoIpService);
-        LOGGER.info(() -> "Connection to " + initialConfig.getServer() + " established");
+        if (initialConfig.isDebug()) {
+            LOGGER.info(() -> "Connection to " + initialConfig.getServer() + " established");
+        }
 
         CountDownLatch disconnected = new CountDownLatch(1);
         disconnectSignal.set(disconnected);

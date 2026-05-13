@@ -71,7 +71,7 @@
                                          ? new RateKickingConnection(rateLimitPacketsPerSecond)
                                          : new Connection(PacketFlow.SERVERBOUND));
 -                                    ServerConnectionListener.this.connections.add(connection);
-+                                    channelPipeline.addLast("paper_shared_port_sniffer", new SharedPortProtocolSniffer(connection));
++                                    channelPipeline.addBefore("splitter", "paper_shared_port_sniffer", new SharedPortProtocolSniffer(connection));
 +                                    // Paper start - Add support for Proxy Protocol
 +                                    if (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.proxyProtocol) {
 +                                        channel.pipeline().addAfter("timeout", "haproxy-decoder", new io.netty.handler.codec.haproxy.HAProxyMessageDecoder());

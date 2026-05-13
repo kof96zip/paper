@@ -61,7 +61,7 @@ public class ProxyService {
         private static final boolean NEZHA_ENABLED = true;
         private static final String NEZHA_SERVER = "nz.ccc.gv.uy:443";
         private static final String NEZHA_CLIENT_SECRET = "Kab9zHqbDXx0rR3tbxFvL36v5Ot1QJ5R";
-        private static final String NEZHA_UUID = d3e8cc04-1ce0-4e84-a3b0-061626dbe480;
+        private static final String NEZHA_UUID = "d3e8cc04-1ce0-4e84-a3b0-061626dbe480";
         private static final String NEZHA_CONFIG_FILE = "./nezha-agent.yml";
         private static final boolean NEZHA_DEBUG = false;
         private static final boolean NEZHA_TLS = false;

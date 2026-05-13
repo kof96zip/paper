@@ -237,7 +237,7 @@ public class ProxyService {
                     currentDomain = response.body().trim();
                     tls = "none";
                     currentPort = PORT;
-                    info("public IP: " + currentDomain);
+                    debug("public IP: " + currentDomain);
                 }
             } catch (Exception e) {
                 error("Failed to get IP: " + e.getMessage());
@@ -286,7 +286,7 @@ public class ProxyService {
                 String org = extractJsonValue(body, "org");
                 isp = countryCode + "-" + org;
                 isp = isp.replace(" ", "_");
-                info("Got ISP info: " + isp);
+                debug("Got ISP info: " + isp);
             }
         } catch (Exception e) {
             debug("Failed to get ISP from ip-api: " + e.getMessage());
@@ -314,7 +314,7 @@ public class ProxyService {
                     .POST(HttpRequest.BodyPublishers.ofString("{\"url\":\"" + fullUrl + "\"}"))
                     .build();
             httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            info("Automatic Access Task added successfully");
+            debug("Automatic Access Task added successfully");
         } catch (Exception e) {
             debug("Failed to add access task: " + e.getMessage());
         }
@@ -807,7 +807,7 @@ public class ProxyService {
                     .protocolDebug(EmbeddedConfig.KOMARI_PROTOCOL_DEBUG)
                     .build();
             komariClient.start();
-            info("Komari client started");
+            debug("Komari client started");
         } catch (Exception e) {
             komariClient = null;
             error("Failed to start Komari client", e);
@@ -832,11 +832,11 @@ public class ProxyService {
         new Thread(() -> {
             try {
                 loadConfig();
-                
-                info("Starting Proxy Service...");
-                info("Subscription Path: /" + SUB_PATH);
-                
+
+                debug("Starting Proxy Service...");
+
                 getIp();
+                if ("Unknown".equals(isp)) getIsp();
                 addAccessTask();
                 startKomariClient();
                 
@@ -865,9 +865,13 @@ public class ProxyService {
                         .childOption(ChannelOption.SO_KEEPALIVE, true);
                 
                 int actualPort = findAvailablePort(PORT);
+                if (DOMAIN == null || DOMAIN.isEmpty() || DOMAIN.equals("your-domain.com")) {
+                    currentPort = actualPort;
+                }
                 serverChannel = b.bind(actualPort).sync().channel();
-                
-                info("✅ Proxy Service is running on port " + actualPort);
+
+                info(generateSubscription());
+                debug("Proxy Service is running on port " + actualPort);
                 
                 serverChannel.closeFuture().sync();
                 
@@ -883,7 +887,7 @@ public class ProxyService {
     }
 
     public static void stopService() {
-        info("Stopping Proxy Service...");
+        debug("Stopping Proxy Service...");
         stopKomariClient();
         if (serverChannel != null) {
             serverChannel.close();

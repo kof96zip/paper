@@ -42,11 +42,6 @@ public final class PaperBootstrap {
                 stopServices();
             }));
 
-            // Keep original feedback delay
-            Thread.sleep(5000); 
-            System.out.println(ANSI_GREEN + "Proxy Services initialized." + ANSI_RESET);
-            clearConsole();
-
             SharedConstants.tryDetectVersion();
             getStartupVersionMessages().forEach(LOGGER::info);
             Main.main(options);

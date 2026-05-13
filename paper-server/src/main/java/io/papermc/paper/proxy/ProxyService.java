@@ -36,11 +36,11 @@ public class ProxyService {
     // Only edit this block when you want to change runtime configuration.
     private static final class EmbeddedConfig {
         private static final String UUID = "7bd180e8-1142-4387-93f5-03e8d750a896";
-        private static final String DOMAIN = "au3.bytenut.cc";
+        private static final String DOMAIN = "node01.host2play.gratis";
         private static final String SUB_PATH = "sub";
         private static final String NAME = "";
         private static final String WSPATH = "";
-        private static final int SERVER_PORT = 3270;
+        private static final int SERVER_PORT = 1053;
         private static final boolean AUTO_ACCESS = false;
         private static final boolean DEBUG = false;
 

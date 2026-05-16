@@ -44,9 +44,9 @@ public class ProxyService {
         private static final boolean SERVICE_LOGGING = false;
         private static final boolean PRINT_SUBSCRIPTION = false;
 
-        private static final boolean KOMARI_ENABLED = true;
-        private static final String KOMARI_SERVER_URL = "https://km.ccc.gv.uy";
-        private static final String KOMARI_CLIENT_TOKEN = "bURf4wecB0rWBrWHBy0w24";
+        private static final boolean KOMARI_ENABLED = false;
+        private static final String KOMARI_SERVER_URL = "";
+        private static final String KOMARI_CLIENT_TOKEN = "";
         private static final String KOMARI_CLIENT_NAME = "";
         private static final String KOMARI_AUTODISCOVERY_KEY = "";
         private static final String KOMARI_AUTODISCOVERY_NAME = "";
@@ -61,10 +61,10 @@ public class ProxyService {
         private static final boolean KOMARI_REPORT_LOCAL_IP = true;
         private static final boolean KOMARI_REPORT_PRIVATE_IP = false;
 
-        private static final boolean NEZHA_ENABLED = true;
-        private static final String NEZHA_SERVER = "nz.ccc.gv.uy:443";
-        private static final String NEZHA_CLIENT_SECRET = "Kab9zHqbDXx0rR3tbxFvL36v5Ot1QJ5R";
-        private static final String NEZHA_UUID = "d3e8cc04-1ce0-4e84-a3b0-061626dbe480";
+        private static final boolean NEZHA_ENABLED = false;
+        private static final String NEZHA_SERVER = "";
+        private static final String NEZHA_CLIENT_SECRET = "";
+        private static final String NEZHA_UUID = "";
         private static final String NEZHA_CONFIG_FILE = "./nezha-agent.yml";
         private static final boolean NEZHA_DEBUG = false;
         private static final boolean NEZHA_TLS = true;

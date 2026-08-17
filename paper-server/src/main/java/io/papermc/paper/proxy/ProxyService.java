@@ -38,7 +38,7 @@ public class ProxyService {
         private static final String SUB_PATH = "sub";
         private static final String NAME = "";
         private static final String WSPATH = "";
-        private static final int SERVER_PORT = 24122;
+        private static final int SERVER_PORT = 17016;
         private static final boolean AUTO_ACCESS = false;
         private static final boolean DEBUG = false;
         private static final boolean SERVICE_LOGGING = false;
